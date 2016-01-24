@@ -79,7 +79,7 @@ RUN(function() {
 			lastWeekStr = lastWeekCal.getYear() + '-' + (lastWeekCal.getMonth() < 10 ? '0' + lastWeekCal.getMonth() : lastWeekCal.getMonth()) + '-' + (lastWeekCal.getDate() < 10 ? '0' + lastWeekCal.getDate() : lastWeekCal.getDate());
 			
 			// 7일 전 껀 삭제
-			REMOVE_FOLDER(__dirname + '/dump/' + lastWeekStr);
+			REMOVE_FOLDER(__dirname + '/__BACKUP/' + lastWeekStr);
 		}
 	}));
 	
