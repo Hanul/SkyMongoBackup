@@ -12,20 +12,8 @@ RUN(function() {
 		isSync : true
 	})),
 	
-	// db names
-	dbNames = CHECK_IS_ARRAY(config.dbName) === true ? config.dbName : [config.dbName],
-	
-	// db host
-	dbHost = config.dbHost === undefined ? '127.0.0.1' : config.dbHost,
-
-	// db port
-	dbPort = config.dbPort === undefined ? 27017 : config.dbPort,
-	
-	// db username
-	dbUsername = config.dbUsername,
-	
-	// db password
-	dbPassword = config.dbPassword;
+	// configs
+	configs = config.configs === undefined ? [config] : config.configs;
 	
 	// 1분에 한번씩 체크
 	INTERVAL(60, RAR(function() {
@@ -46,9 +34,24 @@ RUN(function() {
 		// 새벅 5시에 백업
 		if (nowCal.getHour() === 5 && nowCal.getMinute() === 0) {
 			
-			EACH(dbNames, function(dbName) {
+			EACH(configs, function(config) {
 				
 				var
+				// db name
+				dbName = config.dbName,
+				
+				// db host
+				dbHost = config.dbHost === undefined ? '127.0.0.1' : config.dbHost,
+			
+				// db port
+				dbPort = config.dbPort === undefined ? 27017 : config.dbPort,
+				
+				// db username
+				dbUsername = config.dbUsername,
+				
+				// db password
+				dbPassword = config.dbPassword,
+				
 				// command
 				command = 'mongodump';
 				
