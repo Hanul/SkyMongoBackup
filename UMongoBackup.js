@@ -67,7 +67,7 @@ RUN(function() {
 					command += ' --password ' + dbPassword;
 				}
 				
-				command += ' --out ' + __dirname + '/dump/' + todayStr;
+				command += ' --out ' + __dirname + '/__BACKUP/' + todayStr;
 				
 				exec(command, function(error) {
 					if (error === TO_DELETE) {
