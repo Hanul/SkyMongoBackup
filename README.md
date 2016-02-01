@@ -1,5 +1,26 @@
 # UMongodump
-매일 새벅 5시에 데이터베이스를 백업합니다. 최대 7일간의 데이터를 백업합니다.
+서버 시간으로 매일 새벅 5시에 데이터베이스를 백업합니다. 최대 7일간의 데이터를 백업합니다.
+
+## 설정
+`config.json` 파일을 수정합니다.
+```javascript
+{
+	"dbName": "test",
+	"dbHost": "127.0.0.1",
+	"dbPort": 27017,
+	"dbUsername": "test",
+	"dbPassword": "1234"
+}
+```
+`dbName`는 필수이며, 나머지 설정들은 선택입니다.
+
+## 실행
+```
+node UMongoBackup.js
+```
+```
+forever start UMongoBackup.js
+```
 
 ## 라이센스
 [MIT](LICENSE)
