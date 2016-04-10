@@ -71,9 +71,9 @@ RUN(function() {
 				
 				exec(command, function(error) {
 					if (error === TO_DELETE) {
-						console.log(CONSOLE_GREEN('[UMongoBackup] ' + todayStr + ' `' + dbName + '` BACKED UP!'));
+						console.log(CONSOLE_GREEN('[SkyMongoBackup] ' + todayStr + ' `' + dbName + '` BACKED UP!'));
 					} else {
-						console.log(CONSOLE_RED('[UMongoBackup] `' + dbName + '` ERROR:'), error.toString());
+						console.log(CONSOLE_RED('[SkyMongoBackup] `' + dbName + '` ERROR:'), error.toString());
 					}
 				});
 			});
@@ -86,5 +86,5 @@ RUN(function() {
 		}
 	}));
 	
-	console.log('[UMongoBackup] RUNNING...');
+	console.log('[SkyMongoBackup] RUNNING...');
 });
