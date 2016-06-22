@@ -716,74 +716,22 @@ global.OVERRIDE = METHOD({
  */
 global.PARALLEL = METHOD({
 
-	run : function(countOrArray, funcs) {
+	run : function(dataOrArrayOrCount, funcs) {
 		'use strict';
-		//OPTIONAL: countOrArray
+		//OPTIONAL: dataOrArrayOrCount
 		//REQUIRED: funcs
 
 		var
-		// count
-		count,
-
-		// array
-		array,
-
+		// property count
+		propertyCount,
+		
 		// done count
 		doneCount = 0;
 
+		// only funcs
 		if (funcs === undefined) {
-			funcs = countOrArray;
-			countOrArray = undefined;
-		}
-
-		if (countOrArray !== undefined) {
-			if (CHECK_IS_ARRAY(countOrArray) !== true) {
-				count = countOrArray;
-			} else {
-				array = countOrArray;
-			}
-		}
-
-		if (count !== undefined) {
-
-			if (count === 0) {
-				funcs[1]();
-			} else {
-
-				REPEAT(count, function(i) {
-
-					funcs[0](i, function() {
-
-						doneCount += 1;
-
-						if (doneCount === count) {
-							funcs[1]();
-						}
-					});
-				});
-			}
-
-		} else if (array !== undefined) {
-
-			if (array.length === 0) {
-				funcs[1]();
-			} else {
-
-				EACH(array, function(value, i) {
-
-					funcs[0](value, function() {
-
-						doneCount += 1;
-
-						if (doneCount === array.length) {
-							funcs[1]();
-						}
-					}, i);
-				});
-			}
-
-		} else {
-
+			funcs = dataOrArrayOrCount;
+			
 			RUN(function() {
 
 				var
@@ -805,6 +753,76 @@ global.PARALLEL = METHOD({
 					}
 				});
 			});
+		}
+		
+		// when dataOrArrayOrCount is undefined
+		else if (dataOrArrayOrCount === undefined) {
+			funcs[1]();
+		}
+		
+		// when dataOrArrayOrCount is data
+		else if (CHECK_IS_DATA(dataOrArrayOrCount) === true) {
+			
+			propertyCount = COUNT_PROPERTIES(dataOrArrayOrCount);
+
+			if (propertyCount === 0) {
+				funcs[1]();
+			} else {
+
+				EACH(dataOrArrayOrCount, function(value, name) {
+
+					funcs[0](value, function() {
+
+						doneCount += 1;
+
+						if (doneCount === propertyCount) {
+							funcs[1]();
+						}
+					}, name);
+				});
+			}
+		}
+		
+		// when dataOrArrayOrCount is array
+		else if (CHECK_IS_ARRAY(dataOrArrayOrCount) === true) {
+	
+			if (dataOrArrayOrCount.length === 0) {
+				funcs[1]();
+			} else {
+
+				EACH(dataOrArrayOrCount, function(value, i) {
+
+					funcs[0](value, function() {
+
+						doneCount += 1;
+
+						if (doneCount === dataOrArrayOrCount.length) {
+							funcs[1]();
+						}
+					}, i);
+				});
+			}
+		}
+		
+		// when dataOrArrayOrCount is count
+		else {
+	
+			if (dataOrArrayOrCount === 0) {
+				funcs[1]();
+			} else {
+
+				REPEAT(dataOrArrayOrCount, function(i) {
+
+					funcs[0](i, function() {
+
+						doneCount += 1;
+
+						if (doneCount === dataOrArrayOrCount) {
+							funcs[1]();
+						}
+					});
+				});
+			}
 		}
 	}
 });
@@ -1141,16 +1159,13 @@ global.VALID = CLASS(function(cls) {
 		max = params.max,
 
 		// string
-		str = String(params.value),
-
-		// length
-		length = str.length;
-
+		str = String(params.value);
+		
 		if (min === undefined) {
 			min = 0;
 		}
 
-		return min <= length && (max === undefined || length <= max);
+		return min <= str.trim().length && (max === undefined || str.length <= max);
 	};
 
 	cls.integer = integer = function(value) {
@@ -3113,7 +3128,7 @@ global.EACH = METHOD({
 		else if (CHECK_IS_DATA(dataOrArrayOrString) === true) {
 
 			for (name in dataOrArrayOrString) {
-				if (dataOrArrayOrString.hasOwnProperty(name) === true) {
+				if (dataOrArrayOrString.hasOwnProperty === undefined || dataOrArrayOrString.hasOwnProperty(name) === true) {
 					if (func(dataOrArrayOrString[name], name) === false) {
 						return false;
 					}
@@ -3332,12 +3347,17 @@ global.CPU_CLUSTERING = METHOD(function(m) {
 	var
 	//IMPORT: cluster
 	cluster = require('cluster'),
+	
+	// cpu count
+	cpuCount = require('os').cpus().length,
 
 	// worker id
 	workerId = 1,
 
 	// get worker id.
 	getWorkerId;
+	
+	cluster.schedulingPolicy = cluster.SCHED_RR;
 
 	m.getWorkerId = getWorkerId = function() {
 		return workerId;
@@ -3360,10 +3380,10 @@ global.CPU_CLUSTERING = METHOD(function(m) {
 						var
 						// new worker
 						newWorker = cluster.fork();
-
+						
 						// receive data from new worker.
 						newWorker.on('message', function(data) {
-
+							
 							// send data to all workers except new worker.
 							EACH(cluster.workers, function(worker) {
 								if (worker !== newWorker) {
@@ -3374,12 +3394,12 @@ global.CPU_CLUSTERING = METHOD(function(m) {
 					};
 
 					// fork workers.
-					REPEAT(require('os').cpus().length, function() {
+					REPEAT(cpuCount, function() {
 						fork();
 					});
 
 					cluster.on('exit', function(worker, code, signal) {
-						console.log(CONSOLE_RED('[UJS-CPU_CLUSTERING] WORKER #' + worker.id + ' died. (' + (signal !== undefined ? signal : code) + '). restarting...'));
+						SHOW_ERROR('[UJS-CPU_CLUSTERING] WORKER #' + worker.id + ' died. (' + (signal !== undefined ? signal : code) + '). restarting...');
 						fork();
 					});
 				});
@@ -3500,7 +3520,7 @@ global.CPU_CLUSTERING = METHOD(function(m) {
 
 						process.send(STRINGIFY(params));
 					};
-
+					
 					work();
 
 					console.log(CONSOLE_GREEN('[UJS-CPU_CLUSTERING] RUNNING WORKER... (ID:' + workerId + ')'));
@@ -3647,61 +3667,74 @@ global.CPU_SHARED_DB = CLASS(function(cls) {
 		delete data.$pull;
 		
 		savedData = storage[id];
-		savedData = storage[id] = savedData === undefined ? data : COMBINE([savedData, data]);
 		
-		if ($inc !== undefined) {
-			EACH($inc, function(value, name) {
-				savedData[name] += value;
-			});
-		}
-		
-		if ($push !== undefined) {
+		if (savedData !== undefined) {
 			
-			EACH($push, function(value, name) {
+			EXTEND({
+				origin : savedData,
+				extend : data
+			});
+			
+			if ($inc !== undefined) {
+				EACH($inc, function(value, name) {
+					savedData[name] += value;
+				});
+			}
+			
+			if ($push !== undefined) {
 				
-				if (CHECK_IS_ARRAY(savedData[name]) === true) {
+				EACH($push, function(value, name) {
 					
-					if (CHECK_IS_DATA(value) === true) {
+					if (CHECK_IS_ARRAY(savedData[name]) === true) {
 						
-						if (value.$each !== undefined) {
+						if (CHECK_IS_DATA(value) === true) {
 							
-							EACH(value.$each, function(v, i) {
-								if (value.$position !== undefined) {
-									savedData[name].splice(value.$position + i, 0, v);
-								} else {
-									savedData[name].push(v);
-								}
-							});
+							if (value.$each !== undefined) {
+								
+								EACH(value.$each, function(v, i) {
+									if (value.$position !== undefined) {
+										savedData[name].splice(value.$position + i, 0, v);
+									} else {
+										savedData[name].push(v);
+									}
+								});
+								
+							} else {
+								savedData[name].push(value);
+							}
 							
 						} else {
 							savedData[name].push(value);
 						}
-						
-					} else {
-						savedData[name].push(value);
 					}
-				}
-			});
-		}
-		
-		if ($addToSet !== undefined) {
+				});
+			}
 			
-			EACH($addToSet, function(value, name) {
+			if ($addToSet !== undefined) {
 				
-				if (CHECK_IS_ARRAY(savedData[name]) === true) {
+				EACH($addToSet, function(value, name) {
 					
-					if (CHECK_IS_DATA(value) === true) {
+					if (CHECK_IS_ARRAY(savedData[name]) === true) {
 						
-						if (value.$each !== undefined) {
+						if (CHECK_IS_DATA(value) === true) {
 							
-							EACH(value.$each, function(value) {
-								if (CHECK_IS_IN({
-									array : savedData[name],
-									value : value
-								}) !== true) {
-									savedData[name].push(value);
-								}
-							});
+							if (value.$each !== undefined) {
+								
+								EACH(value.$each, function(value) {
+									if (CHECK_IS_IN({
+										array : savedData[name],
+										value : value
+									}) !== true) {
+										savedData[name].push(value);
+									}
+								});
+								
+							} else if (CHECK_IS_IN({
+								array : savedData[name],
+								value : value
+							}) !== true) {
+								savedData[name].push(value);
+							}
 							
 						} else if (CHECK_IS_IN({
 							array : savedData[name],
@@ -3709,42 +3742,36 @@ global.CPU_SHARED_DB = CLASS(function(cls) {
 						}) !== true) {
 							savedData[name].push(value);
 						}
-						
-					} else if (CHECK_IS_IN({
-						array : savedData[name],
-						value : value
-					}) !== true) {
-						savedData[name].push(value);
 					}
-				}
-			});
-		}
-		
-		if ($pull !== undefined) {
+				});
+			}
 			
-			EACH($pull, function(value, name) {
+			if ($pull !== undefined) {
 				
-				if (CHECK_IS_ARRAY(savedData[name]) === true) {
+				EACH($pull, function(value, name) {
 					
-					REMOVE({
-						array : savedData[name],
-						value : value
-					});
-				}
-			});
-		}
-		
-		if (removeDelays === undefined) {
-			removeDelays = removeDelayMap[dbName] = {};
-		}
-
-		if (removeDelays[id] !== undefined) {
-			removeDelays[id].remove();
-			delete removeDelays[id];
-		}
-
-		if (removeAfterSeconds !== undefined) {
-			removeDelays[id] = DELAY(removeAfterSeconds, remove);
+					if (CHECK_IS_ARRAY(savedData[name]) === true) {
+						
+						REMOVE({
+							array : savedData[name],
+							value : value
+						});
+					}
+				});
+			}
+			
+			if (removeDelays === undefined) {
+				removeDelays = removeDelayMap[dbName] = {};
+			}
+	
+			if (removeDelays[id] !== undefined) {
+				removeDelays[id].remove();
+				delete removeDelays[id];
+			}
+	
+			if (removeAfterSeconds !== undefined) {
+				removeDelays[id] = DELAY(removeAfterSeconds, remove);
+			}
 		}
 	};
 
@@ -4426,6 +4453,8 @@ global.SERVER_CLUSTERING = METHOD(function(m) {
 							on('__DISCONNECTED', function() {
 								delete serverSends[serverName];
 								delete isConnectings[serverName];
+								
+								SHOW_ERROR('[UJS-SERVER_CLUSTERING] DISCONNECTED CLUSTERING SERVER. (SERVER NAME:' + serverName + ')');
 							});
 
 							console.log('[UJS-SERVER_CLUSTERING] CONNECTED CLUSTERING SERVER. (SERVER NAME:' + serverName + ')');
@@ -4468,10 +4497,13 @@ global.SERVER_CLUSTERING = METHOD(function(m) {
 				});
 
 				socketServeOn('__DISCONNECTED', function() {
+					
 					REMOVE({
 						array : socketServeOns,
 						value : socketServeOn
 					});
+					
+					SHOW_ERROR('[UJS-SERVER_CLUSTERING] DISCONNECTED CLUSTERING SERVER.');
 				});
 			});
 
@@ -4625,6 +4657,9 @@ global.SHARED_DB = CLASS(function(cls) {
 
 	// remove delay map
 	removeDelayMap = {},
+	
+	// get storages.
+	getStorages,
 
 	// save.
 	save,
@@ -4646,6 +4681,10 @@ global.SHARED_DB = CLASS(function(cls) {
 	
 	// clear.
 	clear;
+	
+	cls.getStorages = getStorages = function() {
+		return storages;
+	};
 
 	cls.save = save = function(params, remove) {
 		//REQUIRED: params
@@ -4750,61 +4789,74 @@ global.SHARED_DB = CLASS(function(cls) {
 		delete data.$pull;
 		
 		savedData = storage[id];
-		savedData = storage[id] = savedData === undefined ? data : COMBINE([savedData, data]);
 		
-		if ($inc !== undefined) {
-			EACH($inc, function(value, name) {
-				savedData[name] += value;
-			});
-		}
-		
-		if ($push !== undefined) {
+		if (savedData !== undefined) {
 			
-			EACH($push, function(value, name) {
+			EXTEND({
+				origin : savedData,
+				extend : data
+			});
+			
+			if ($inc !== undefined) {
+				EACH($inc, function(value, name) {
+					savedData[name] += value;
+				});
+			}
+			
+			if ($push !== undefined) {
 				
-				if (CHECK_IS_ARRAY(savedData[name]) === true) {
+				EACH($push, function(value, name) {
 					
-					if (CHECK_IS_DATA(value) === true) {
+					if (CHECK_IS_ARRAY(savedData[name]) === true) {
 						
-						if (value.$each !== undefined) {
+						if (CHECK_IS_DATA(value) === true) {
 							
-							EACH(value.$each, function(v, i) {
-								if (value.$position !== undefined) {
-									savedData[name].splice(value.$position + i, 0, v);
-								} else {
-									savedData[name].push(v);
-								}
-							});
+							if (value.$each !== undefined) {
+								
+								EACH(value.$each, function(v, i) {
+									if (value.$position !== undefined) {
+										savedData[name].splice(value.$position + i, 0, v);
+									} else {
+										savedData[name].push(v);
+									}
+								});
+								
+							} else {
+								savedData[name].push(value);
+							}
 							
 						} else {
 							savedData[name].push(value);
 						}
-						
-					} else {
-						savedData[name].push(value);
 					}
-				}
-			});
-		}
-		
-		if ($addToSet !== undefined) {
+				});
+			}
 			
-			EACH($addToSet, function(value, name) {
+			if ($addToSet !== undefined) {
 				
-				if (CHECK_IS_ARRAY(savedData[name]) === true) {
+				EACH($addToSet, function(value, name) {
 					
-					if (CHECK_IS_DATA(value) === true) {
+					if (CHECK_IS_ARRAY(savedData[name]) === true) {
 						
-						if (value.$each !== undefined) {
+						if (CHECK_IS_DATA(value) === true) {
 							
-							EACH(value.$each, function(value) {
-								if (CHECK_IS_IN({
-									array : savedData[name],
-									value : value
-								}) !== true) {
-									savedData[name].push(value);
-								}
-							});
+							if (value.$each !== undefined) {
+								
+								EACH(value.$each, function(value) {
+									if (CHECK_IS_IN({
+										array : savedData[name],
+										value : value
+									}) !== true) {
+										savedData[name].push(value);
+									}
+								});
+								
+							} else if (CHECK_IS_IN({
+								array : savedData[name],
+								value : value
+							}) !== true) {
+								savedData[name].push(value);
+							}
 							
 						} else if (CHECK_IS_IN({
 							array : savedData[name],
@@ -4812,42 +4864,36 @@ global.SHARED_DB = CLASS(function(cls) {
 						}) !== true) {
 							savedData[name].push(value);
 						}
-						
-					} else if (CHECK_IS_IN({
-						array : savedData[name],
-						value : value
-					}) !== true) {
-						savedData[name].push(value);
 					}
-				}
-			});
-		}
-		
-		if ($pull !== undefined) {
+				});
+			}
 			
-			EACH($pull, function(value, name) {
+			if ($pull !== undefined) {
 				
-				if (CHECK_IS_ARRAY(savedData[name]) === true) {
+				EACH($pull, function(value, name) {
 					
-					REMOVE({
-						array : savedData[name],
-						value : value
-					});
-				}
-			});
-		}
-		
-		if (removeDelays === undefined) {
-			removeDelays = removeDelayMap[dbName] = {};
-		}
-
-		if (removeDelays[id] !== undefined) {
-			removeDelays[id].remove();
-			delete removeDelays[id];
-		}
-
-		if (removeAfterSeconds !== undefined) {
-			removeDelays[id] = DELAY(removeAfterSeconds, remove);
+					if (CHECK_IS_ARRAY(savedData[name]) === true) {
+						
+						REMOVE({
+							array : savedData[name],
+							value : value
+						});
+					}
+				});
+			}
+			
+			if (removeDelays === undefined) {
+				removeDelays = removeDelayMap[dbName] = {};
+			}
+	
+			if (removeDelays[id] !== undefined) {
+				removeDelays[id].remove();
+				delete removeDelays[id];
+			}
+	
+			if (removeAfterSeconds !== undefined) {
+				removeDelays[id] = DELAY(removeAfterSeconds, remove);
+			}
 		}
 	};
 
@@ -5186,6 +5232,9 @@ global.SHARED_STORE = CLASS(function(cls) {
 
 	// remove delay map
 	removeDelayMap = {},
+	
+	// get storages.
+	getStorages,
 
 	// save.
 	save,
@@ -5204,6 +5253,10 @@ global.SHARED_STORE = CLASS(function(cls) {
 	
 	// clear.
 	clear;
+	
+	cls.getStorages = getStorages = function() {
+		return storages;
+	};
 
 	cls.save = save = function(params, remove) {
 		//REQUIRED: params
@@ -5655,43 +5708,62 @@ global.CONNECT_TO_SOCKET_SERVER = METHOD({
 			},
 
 			// send to server.
-			send = function(params, callback) {
-				//REQUIRED: params
-				//REQUIRED: params.methodName
-				//OPTIONAL: params.data
+			send = function(methodNameOrParams, callback) {
+				//REQUIRED: methodNameOrParams
+				//REQUIRED: methodNameOrParams.methodName
+				//OPTIONAL: methodNameOrParams.data
 				//OPTIONAL: callback
 				
 				var
+				// method name
+				methodName,
+				
+				// data
+				data,
+				
 				// callback name
 				callbackName;
-
-				conn.write(STRINGIFY({
-					methodName : params.methodName,
-					data : params.data,
-					sendKey : sendKey
-				}) + '\r\n');
-
-				if (callback !== undefined) {
-					
-					callbackName = '__CALLBACK_' + sendKey;
-
-					// on callback.
-					on(callbackName, function(data) {
-
-						// run callback.
-						callback(data);
-
-						// off callback.
-						off(callbackName);
-					});
+				
+				if (CHECK_IS_DATA(methodNameOrParams) !== true) {
+					methodName = methodNameOrParams;
+				} else {
+					methodName = methodNameOrParams.methodName;
+					data = methodNameOrParams.data;
 				}
-
-				sendKey += 1;
+				
+				if (conn !== undefined) {
+					
+					conn.write(STRINGIFY({
+						methodName : methodName,
+						data : data,
+						sendKey : sendKey
+					}) + '\r\n');
+	
+					if (callback !== undefined) {
+						
+						callbackName = '__CALLBACK_' + sendKey;
+	
+						// on callback.
+						on(callbackName, function(data) {
+	
+							// run callback.
+							callback(data);
+	
+							// off callback.
+							off(callbackName);
+						});
+					}
+	
+					sendKey += 1;
+				}
 			},
 
 			// disconnect.
 			function() {
-				conn.end();
+				if (conn !== undefined) {
+					conn.end();
+					conn = undefined;
+				}
 			});
 		});
 
@@ -5741,7 +5813,7 @@ global.CONNECT_TO_SOCKET_SERVER = METHOD({
 				if (errorListener !== undefined) {
 					errorListener(errorMsg);
 				} else {
-					console.log(CONSOLE_RED('[UJS-CONNECT_TO_SOCKET_SERVER] CONNECT TO SOCKET SERVER FAILED: ' + errorMsg));
+					SHOW_ERROR('[UJS-CONNECT_TO_SOCKET_SERVER] CONNECT TO SOCKET SERVER FAILED: ' + errorMsg);
 				}
 
 			} else {
@@ -5803,6 +5875,23 @@ global.CONSOLE_YELLOW = METHOD({
 	}
 });
 
+/*
+ * show error.
+ */
+global.SHOW_ERROR = function() {
+	
+	var
+	// args
+	args = Array.prototype.slice.call(arguments);
+	
+	if (args[0] !== undefined) {
+		args[0] = CONSOLE_RED(args[0]);
+	}
+	
+	args.push(new Date());
+	
+	return console.log.apply(console, args);
+};
 /**
  * HMAC SHA1 encrypt.
  */
@@ -5936,18 +6025,26 @@ global.CHECK_IS_FOLDER = METHOD(function() {
 
 	return {
 
-		run : function(pathOrParams, callback) {
+		run : function(pathOrParams, callbackOrHandlers) {
 			//REQUIRED: pathOrParams
 			//REQUIRED: pathOrParams.path
 			//OPTIONAL: pathOrParams.isSync
-			//OPTIONAL: callback
+			//OPTIONAL: callbackOrHandlers
+			//OPTIONAL: callbackOrHandlers.success
+			//OPTIONAL: callbackOrHandlers.error
 
 			var
 			// path
 			path,
 
 			// is sync
-			isSync;
+			isSync,
+			
+			// callback.
+			callback,
+
+			// error handler.
+			errorHandler;
 
 			// init params.
 			if (CHECK_IS_DATA(pathOrParams) !== true) {
@@ -5955,6 +6052,15 @@ global.CHECK_IS_FOLDER = METHOD(function() {
 			} else {
 				path = pathOrParams.path;
 				isSync = pathOrParams.isSync;
+			}
+			
+			if (callbackOrHandlers !== undefined) {
+				if (CHECK_IS_DATA(callbackOrHandlers) !== true) {
+					callback = callbackOrHandlers;
+				} else {
+					callback = callbackOrHandlers.success;
+					errorHandler = callbackOrHandlers.error;
+				}
 			}
 
 			// when normal mode
@@ -5973,7 +6079,7 @@ global.CHECK_IS_FOLDER = METHOD(function() {
 						if (errorHandler !== undefined) {
 							errorHandler(errorMsg);
 						} else {
-							console.log(CONSOLE_RED('[UJS-CHECK_IS_FOLDER] ERROR: ' + errorMsg));
+							SHOW_ERROR('[UJS-CHECK_IS_FOLDER] ERROR: ' + errorMsg);
 						}
 
 					} else if (callback !== undefined) {
@@ -6077,7 +6183,7 @@ global.COPY_FILE = METHOD(function() {
 									if (errorHandler !== undefined) {
 										errorHandler(errorMsg);
 									} else {
-										console.log(CONSOLE_RED('[UJS-COPY_FILE] ERROR:' + errorMsg));
+										SHOW_ERROR('[UJS-COPY_FILE] ERROR:' + errorMsg);
 									}
 								});
 
@@ -6137,7 +6243,7 @@ global.COPY_FILE = METHOD(function() {
 									if (errorHandler !== undefined) {
 										errorHandler(errorMsg);
 									} else {
-										console.log(CONSOLE_RED('[UJS-COPY_FILE] ERROR: ' + errorMsg));
+										SHOW_ERROR('[UJS-COPY_FILE] ERROR: ' + errorMsg);
 									}
 								}
 							}
@@ -6241,7 +6347,7 @@ global.CREATE_FOLDER = METHOD(function() {
 										if (errorHandler !== undefined) {
 											errorHandler(errorMsg);
 										} else {
-											console.log(CONSOLE_RED('[UJS-CREATE_FOLDER] ERROR: ' + errorMsg));
+											SHOW_ERROR('[UJS-CREATE_FOLDER] ERROR: ' + errorMsg);
 										}
 
 									} else {
@@ -6309,7 +6415,7 @@ global.CREATE_FOLDER = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-CREATE_FOLDER] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-CREATE_FOLDER] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -6404,7 +6510,7 @@ global.FIND_FILE_NAMES = METHOD(function() {
 								if (errorHandler !== undefined) {
 									errorHandler(errorMsg);
 								} else {
-									console.log(CONSOLE_RED('[UJS-FIND_FILE_NAMES] ERROR:' + errorMsg));
+									SHOW_ERROR('[UJS-FIND_FILE_NAMES] ERROR:' + errorMsg);
 								}
 
 							} else if (callback !== undefined) {
@@ -6427,7 +6533,7 @@ global.FIND_FILE_NAMES = METHOD(function() {
 												if (errorHandler !== undefined) {
 													errorHandler(errorMsg);
 												} else {
-													console.log(CONSOLE_RED('[UJS-FIND_FILE_NAMES] ERROR:' + errorMsg));
+													SHOW_ERROR('[UJS-FIND_FILE_NAMES] ERROR:' + errorMsg);
 												}
 
 											} else {
@@ -6512,7 +6618,7 @@ global.FIND_FILE_NAMES = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-FIND_FILE_NAMES] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-FIND_FILE_NAMES] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -6609,7 +6715,7 @@ global.FIND_FOLDER_NAMES = METHOD(function() {
 								if (errorHandler !== undefined) {
 									errorHandler(errorMsg);
 								} else {
-									console.log(CONSOLE_RED('[UJS-FIND_FOLDER_NAMES] ERROR:' + errorMsg));
+									SHOW_ERROR('[UJS-FIND_FOLDER_NAMES] ERROR:' + errorMsg);
 								}
 
 							} else if (callback !== undefined) {
@@ -6632,7 +6738,7 @@ global.FIND_FOLDER_NAMES = METHOD(function() {
 												if (errorHandler !== undefined) {
 													errorHandler(errorMsg);
 												} else {
-													console.log(CONSOLE_RED('[UJS-FIND_FOLDER_NAMES] ERROR:' + errorMsg));
+													SHOW_ERROR('[UJS-FIND_FOLDER_NAMES] ERROR:' + errorMsg);
 												}
 
 											} else {
@@ -6717,7 +6823,7 @@ global.FIND_FOLDER_NAMES = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-FIND_FOLDER_NAMES] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-FIND_FOLDER_NAMES] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -6808,7 +6914,7 @@ global.GET_FILE_INFO = METHOD(function() {
 								if (errorHandler !== undefined) {
 									errorHandler(errorMsg);
 								} else {
-									console.log(CONSOLE_RED('[UJS-GET_FILE_INFO] ERROR: ' + errorMsg));
+									SHOW_ERROR('[UJS-GET_FILE_INFO] ERROR: ' + errorMsg);
 								}
 
 							} else if (stat.isDirectory() === true) {
@@ -6903,7 +7009,7 @@ global.GET_FILE_INFO = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-GET_FILE_INFO] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-GET_FILE_INFO] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -7049,7 +7155,7 @@ global.READ_FILE = METHOD(function() {
 								if (errorHandler !== undefined) {
 									errorHandler(errorMsg);
 								} else {
-									console.log(CONSOLE_RED('[UJS-READ_FILE] ERROR: ' + errorMsg));
+									SHOW_ERROR('[UJS-READ_FILE] ERROR: ' + errorMsg);
 								}
 
 							} else if (stat.isDirectory() === true) {
@@ -7075,7 +7181,7 @@ global.READ_FILE = METHOD(function() {
 										if (errorHandler !== undefined) {
 											errorHandler(errorMsg);
 										} else {
-											console.log(CONSOLE_RED('[UJS-READ_FILE] ERROR: ' + errorMsg));
+											SHOW_ERROR('[UJS-READ_FILE] ERROR: ' + errorMsg);
 										}
 
 									} else if (callback !== undefined) {
@@ -7152,7 +7258,7 @@ global.READ_FILE = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-READ_FILE] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-READ_FILE] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -7238,7 +7344,7 @@ global.REMOVE_FILE = METHOD(function() {
 								if (errorHandler !== undefined) {
 									errorHandler(errorMsg);
 								} else {
-									console.log(CONSOLE_RED('[UJS-REMOVE_FILE] ERROR: ' + errorMsg));
+									SHOW_ERROR('[UJS-REMOVE_FILE] ERROR: ' + errorMsg);
 								}
 
 							} else {
@@ -7299,7 +7405,7 @@ global.REMOVE_FILE = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-REMOVE_FILE] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-REMOVE_FILE] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -7422,7 +7528,7 @@ global.REMOVE_FOLDER = METHOD(function() {
 										if (errorHandler !== undefined) {
 											errorHandler(errorMsg);
 										} else {
-											console.log(CONSOLE_RED('[UJS-REMOVE_FOLDER] ERROR: ' + errorMsg));
+											SHOW_ERROR('[UJS-REMOVE_FOLDER] ERROR: ' + errorMsg);
 										}
 		
 									} else {
@@ -7507,7 +7613,7 @@ global.REMOVE_FOLDER = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-REMOVE_FOLDER] ERROR: ' + errorMsg));
+								SHOW_ERROR('[UJS-REMOVE_FOLDER] ERROR: ' + errorMsg);
 							}
 						}
 					}
@@ -7595,7 +7701,7 @@ global.WRITE_FILE = METHOD(function() {
 							if (errorHandler !== undefined) {
 								errorHandler(errorMsg);
 							} else {
-								console.log(CONSOLE_RED('[UJS-WRITE_FILE] ERROR:' + errorMsg));
+								SHOW_ERROR('[UJS-WRITE_FILE] ERROR:' + errorMsg);
 							}
 
 						} else if (callback !== undefined) {
@@ -7626,7 +7732,7 @@ global.WRITE_FILE = METHOD(function() {
 								if (errorHandler !== undefined) {
 									errorHandler(errorMsg);
 								} else {
-									console.log(CONSOLE_RED('[UJS-WRITE_FILE] ERROR: ' + errorMsg));
+									SHOW_ERROR('[UJS-WRITE_FILE] ERROR: ' + errorMsg);
 								}
 							}
 						}
@@ -7655,6 +7761,7 @@ global.DELETE = METHOD({
 		//OPTIONAL: params.uri
 		//OPTIONAL: params.paramStr
 		//OPTIONAL: params.data
+		//OPTIONAL: params.headers
 		//REQUIRED: responseListenerOrListeners
 
 		REQUEST(COMBINE([params, {
@@ -7691,6 +7798,7 @@ global.DOWNLOAD = METHOD(function() {
 			//OPTIONAL: params.data
 			//OPTIONAL: params.url
 			//REQUIRED: params.path
+			//OPTIONAL: params.headers
 			//OPTIONAL: callbackOrHandlers
 			//OPTIONAL: callbackOrHandlers.success
 			//OPTIONAL: callbackOrHandlers.error
@@ -7719,6 +7827,9 @@ global.DOWNLOAD = METHOD(function() {
 			
 			// path
 			path = params.path,
+			
+			// headers
+			headers = params.headers,
 			
 			// url data
 			urlData,
@@ -7768,7 +7879,8 @@ global.DOWNLOAD = METHOD(function() {
 			req = (isSecure !== true ? http : https).get({
 				hostname : host,
 				port : port,
-				path : '/' + (uri === undefined ? '' : uri) + '?' + paramStr
+				path : '/' + (uri === undefined ? '' : uri) + '?' + paramStr,
+				headers : headers
 			}, function(httpResponse) {
 				
 				var
@@ -7817,7 +7929,7 @@ global.DOWNLOAD = METHOD(function() {
 				if (errorHandler !== undefined) {
 					errorHandler(errorMsg);
 				} else {
-					console.log(CONSOLE_RED('[UJS-NODE] DOWNLOAD FAILED: ' + errorMsg), params);
+					SHOW_ERROR('[UJS-NODE] DOWNLOAD FAILED: ' + errorMsg, params);
 				}
 			});
 		}
@@ -7831,8 +7943,8 @@ global.GET = METHOD(function(m) {
 	'use strict';
 	
 	var
-	//IMPORT: url
-	url = require('url');
+	//IMPORT: URL
+	URL = require('url');
 	
 	return {
 
@@ -7844,6 +7956,7 @@ global.GET = METHOD(function(m) {
 			//REQUIRED: urlOrParams.uri
 			//OPTIONAL: urlOrParams.paramStr
 			//OPTIONAL: urlOrParams.data
+			//OPTIONAL: urlOrParams.headers
 			//REQUIRED: responseListenerOrListeners
 			
 			var
@@ -7855,7 +7968,7 @@ global.GET = METHOD(function(m) {
 			
 			if (CHECK_IS_DATA(urlOrParams) !== true) {
 				
-				urlData = url.parse(urlOrParams);
+				urlData = URL.parse(urlOrParams);
 				
 				params = {
 					host : urlData.hostname === TO_DELETE ? undefined : urlData.hostname,
@@ -7890,6 +8003,7 @@ global.POST = METHOD({
 		//OPTIONAL: params.uri
 		//OPTIONAL: params.paramStr
 		//OPTIONAL: params.data
+		//OPTIONAL: params.headers
 		//REQUIRED: responseListenerOrListeners
 
 		REQUEST(COMBINE([params, {
@@ -7912,6 +8026,7 @@ global.PUT = METHOD({
 		//OPTIONAL: params.uri
 		//OPTIONAL: params.paramStr
 		//OPTIONAL: params.data
+		//OPTIONAL: params.headers
 		//REQUIRED: responseListenerOrListeners
 
 		REQUEST(COMBINE([params, {
@@ -7927,11 +8042,11 @@ global.REQUEST = METHOD(function() {
 	'use strict';
 
 	var
-	//IMPORT: http
-	http = require('http'),
+	//IMPORT: HTTP
+	HTTP = require('http'),
 
-	//IMPORT: https
-	https = require('https');
+	//IMPORT: HTTPS
+	HTTPS = require('https');
 
 	return {
 
@@ -7944,6 +8059,7 @@ global.REQUEST = METHOD(function() {
 			//OPTIONAL: params.uri
 			//OPTIONAL: params.paramStr
 			//OPTIONAL: params.data
+			//OPTIONAL: params.headers
 			//REQUIRED: responseListenerOrListeners
 
 			var
@@ -7967,6 +8083,9 @@ global.REQUEST = METHOD(function() {
 
 			// data
 			data = params.data,
+			
+			// headers
+			headers = params.headers,
 
 			// response listener
 			responseListener,
@@ -8000,10 +8119,11 @@ global.REQUEST = METHOD(function() {
 			// GET request.
 			if (method === 'GET') {
 
-				req = (isSecure !== true ? http : https).get({
+				req = (isSecure !== true ? HTTP : HTTPS).get({
 					hostname : host,
 					port : port,
-					path : '/' + (uri === undefined ? '' : uri) + '?' + paramStr
+					path : '/' + (uri === undefined ? '' : uri) + '?' + paramStr,
+					headers : headers
 				}, function(httpResponse) {
 
 					var
@@ -8038,11 +8158,12 @@ global.REQUEST = METHOD(function() {
 			// other request.
 			else {
 
-				req = (isSecure !== true ? http : https).request({
+				req = (isSecure !== true ? HTTP : HTTPS).request({
 					hostname : host,
 					port : port,
 					path : '/' + (uri === undefined ? '' : uri),
-					method : method
+					method : method,
+					headers : headers
 				}, function(httpResponse) {
 
 					var
@@ -8071,7 +8192,7 @@ global.REQUEST = METHOD(function() {
 				if (errorListener !== undefined) {
 					errorListener(errorMsg);
 				} else {
-					console.log(CONSOLE_RED('[UJS-NODE] REQUEST FAILED: ' + errorMsg), params);
+					SHOW_ERROR('[UJS-NODE] REQUEST FAILED: ' + errorMsg, params);
 				}
 			});
 		}
@@ -8085,83 +8206,113 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 	'use strict';
 
 	var
+	//IMPORT: fs
+	fs = require('fs'),
+	
 	//IMPORT: path
 	path = require('path'),
 
 	//IMPORT: querystring
 	querystring = require('querystring'),
+	
+	// preprocessors
+	preprocessors = {},
 
-	// get content type from uri.
-	getContentTypeFromURI;
+	// get content type from extension.
+	getContentTypeFromExtension,
+	
+	// add preprocessor.
+	addPreprocessor;
 
-	cls.getContentTypeFromURI = getContentTypeFromURI = function(uri) {
-		//REQUIRED: uri
-
-		var
-		// extname
-		extname = path.extname(uri);
-
+	cls.getContentTypeFromExtension = getContentTypeFromExtension = function(extension) {
+		//REQUIRED: ext
+		
 		// png image
-		if (extname === '.png') {
+		if (extension === 'png') {
 			return 'image/png';
 		}
 
 		// jpeg image
-		if (extname === '.jpeg' || extname === '.jpg') {
+		if (extension === 'jpeg' || extension === 'jpg') {
 			return 'image/jpeg';
 		}
 
 		// gif image
-		if (extname === '.gif') {
+		if (extension === 'gif') {
 			return 'image/gif';
 		}
 
 		// svg
-		if (extname === '.svg') {
+		if (extension === 'svg') {
 			return 'image/svg+xml';
 		}
 
 		// javascript
-		if (extname === '.js') {
+		if (extension === 'js') {
 			return 'application/javascript';
 		}
 
 		// json document
-		if (extname === '.json') {
+		if (extension === 'json') {
 			return 'application/json';
 		}
 
 		// css
-		if (extname === '.css') {
+		if (extension === 'css') {
 			return 'text/css';
 		}
 
 		// text
-		if (extname === '.text' || extname === '.txt') {
+		if (extension === 'text' || extension === 'txt') {
 			return 'text/plain';
 		}
 
 		// markdown
-		if (extname === '.markdown' || extname === '.md') {
+		if (extension === 'markdown' || extension === 'md') {
 			return 'text/x-markdown';
 		}
 
 		// html document
-		if (extname === '.html') {
+		if (extension === 'html') {
 			return 'text/html';
 		}
 
 		// swf
-		if (extname === '.swf') {
+		if (extension === 'swf') {
 			return 'application/x-shockwave-flash';
 		}
 
 		// mp3
-		if (extname === '.mp3') {
+		if (extension === 'mp3') {
 			return 'audio/mpeg';
 		}
 
+		// ogg
+		if (extension === 'ogg') {
+			return 'audio/ogg';
+		}
+
+		// mp4
+		if (extension === 'mp4') {
+			return 'video/mp4';
+		}
+
 		return 'application/octet-stream';
+	};
+	
+	cls.addPreprocessor = addPreprocessor = function(params) {
+		//REQUIRED: params
+		//REQUIRED: params.extension
+		//REQUIRED: params.preprocessor
+		
+		var
+		// extension
+		extension = params.extension,
+		
+		// preprocessor
+		preprocessor = params.preprocessor;
+		
+		preprocessors[extension] = preprocessor;
 	};
 
 	return {
@@ -8179,6 +8330,7 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 			//OPTIONAL: requestListenerOrHandlers.requestListener
 			//OPTIONAL: requestListenerOrHandlers.error
 			//OPTIONAL: requestListenerOrHandlers.notExistsResource
+			//OPTIONAL: requestListenerOrHandlers.preprocessor
 
 			var
 			//IMPORT: path
@@ -8204,15 +8356,21 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 
 			// not exists resource handler.
 			notExistsResourceHandler,
+			
+			// preprocessor.
+			preprocessor,
 
 			// resource caches
 			resourceCaches = {},
 
 			// web server
 			webServer,
-
+			
 			// get native http server.
-			getNativeHTTPServer;
+			getNativeHTTPServer,
+			
+			// get native https server.
+			getNativeHTTPSServer;
 
 			// init params.
 			if (CHECK_IS_DATA(portOrParams) !== true) {
@@ -8231,6 +8389,7 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 					requestListener = requestListenerOrHandlers.requestListener;
 					errorHandler = requestListenerOrHandlers.error;
 					notExistsResourceHandler = requestListenerOrHandlers.notExistsResource;
+					preprocessor = requestListenerOrHandlers.preprocessor;
 				}
 			}
 
@@ -8297,9 +8456,60 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 
 				function() {
 					return function() {
+						
+						// stream video.
+						if (headers.range !== undefined) {
+							
+							GET_FILE_INFO(rootPath + '/' + uri, function(fileInfo) {
 
+								var
+								// positions
+								positions = headers.range.replace(/bytes=/, '').split('-'),
+								
+								// total size
+								totalSize = fileInfo.size,
+								
+								// start position
+								startPosition = INTEGER(positions[0]),
+								
+								// end position
+								endPosition = positions[1] === undefined || positions[1] === '' ? totalSize - 1 : INTEGER(positions[1]),
+								
+								// stream
+								stream = fs.createReadStream(rootPath + '/' + uri, {
+									start : startPosition,
+									end : endPosition
+								}).on('open', function() {
+									
+									response(EXTEND({
+										origin : {
+											contentType : getContentTypeFromExtension(path.extname(uri).substring(1)),
+											totalSize : totalSize,
+											startPosition : startPosition,
+											endPosition : endPosition,
+											stream : stream
+										},
+										extend : overrideResponseInfo
+									}));
+									
+								}).on('error', function(error) {
+									
+									response(EXTEND({
+										origin : {
+											contentType : getContentTypeFromExtension(path.extname(uri).substring(1)),
+											totalSize : totalSize,
+											startPosition : startPosition,
+											endPosition : endPosition,
+											content : error.toString()
+										},
+										extend : overrideResponseInfo
+									}));
+								});
+							});
+						}
+						
 						// check ETag.
-						if (CONFIG.isDevMode !== true && (overrideResponseInfo.isFinal !== true ?
+						else if (CONFIG.isDevMode !== true && (overrideResponseInfo.isFinal !== true ?
 
 						// check version.
 						(version !== undefined && headers['if-none-match'] === version) :
@@ -8357,7 +8567,7 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 								if (errorHandler !== undefined) {
 									isGoingOn = errorHandler(errorMsg, requestInfo, response);
 								} else {
-									console.log(CONSOLE_RED('[UJS-RESOURCE_SERVER] ERROR: ' + errorMsg));
+									SHOW_ERROR('[UJS-RESOURCE_SERVER] ERROR: ' + errorMsg);
 								}
 
 								if (isGoingOn !== false && requestInfo.isResponsed !== true) {
@@ -8409,26 +8619,35 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 
 							function() {
 								return function(buffer, contentType) {
-
-									if (contentType === undefined) {
-										contentType = getContentTypeFromURI(uri);
+									
+									var
+									// extension
+									extension = path.extname(uri).substring(1);
+									
+									if (preprocessors[extension] !== undefined) {
+										preprocessors[extension](buffer.toString(), response);
+									} else {
+										
+										if (contentType === undefined) {
+											contentType = getContentTypeFromExtension(extension);
+										}
+	
+										if (CONFIG.isDevMode !== true && overrideResponseInfo.isFinal !== true && resourceCaches[originalURI] === undefined) {
+											resourceCaches[originalURI] = {
+												buffer : buffer,
+												contentType : contentType
+											};
+										}
+	
+										response(EXTEND({
+											origin : {
+												buffer : buffer,
+												contentType : contentType,
+												version : version
+											},
+											extend : overrideResponseInfo
+										}));
 									}
-
-									if (CONFIG.isDevMode !== true && overrideResponseInfo.isFinal !== true && resourceCaches[originalURI] === undefined) {
-										resourceCaches[originalURI] = {
-											buffer : buffer,
-											contentType : contentType
-										};
-									}
-
-									response(EXTEND({
-										origin : {
-											buffer : buffer,
-											contentType : contentType,
-											version : version
-										},
-										extend : overrideResponseInfo
-									}));
 								};
 							}]);
 
@@ -8448,6 +8667,10 @@ global.RESOURCE_SERVER = CLASS(function(cls) {
 
 			self.getNativeHTTPServer = getNativeHTTPServer = function() {
 				return webServer.getNativeHTTPServer();
+			};
+			
+			self.getNativeHTTPSServer = getNativeHTTPSServer = function() {
+				return webServer.getNativeHTTPSServer();
 			};
 		}
 	};
@@ -8527,7 +8750,7 @@ global.SOCKET_SERVER = METHOD({
 				
 				// if catch error
 				catch(error) {
-					console.log(CONSOLE_RED('[UJS-SOCEKT_SERVER] ERROR:'), error.toString());
+					SHOW_ERROR('[UJS-SOCEKT_SERVER] ERROR:', methodName, data, error.toString());
 				}
 			};
 
@@ -8574,11 +8797,16 @@ global.SOCKET_SERVER = METHOD({
 
 				var
 				// error msg
-				errorMsg = error.toString();
-
-				console.log(CONSOLE_RED('[UJS-SOCEKT_SERVER] ERROR:'), errorMsg);
-
-				runMethods('__ERROR', errorMsg);
+				errorMsg;
+				
+				if (error.code !== 'ECONNRESET' && error.code !== 'EPIPE' && error.code !== 'ETIMEDOUT' && error.code !== 'ENETUNREACH' && error.code !== 'EHOSTUNREACH' && error.code !== 'ECONNREFUSED' && error.code !== 'EINVAL') {
+					
+					errorMsg = error.toString();
+					
+					SHOW_ERROR('[UJS-SOCEKT_SERVER] ERROR:', errorMsg);
+					
+					runMethods('__ERROR', errorMsg);
+				}
 			});
 
 			connectionListener(
@@ -8632,45 +8860,76 @@ global.SOCKET_SERVER = METHOD({
 			},
 
 			// send to client.
-			send = function(params, callback) {
-				//REQUIRED: params
-				//REQUIRED: params.methodName
-				//OPTIONAL: params.data
+			send = function(methodNameOrParams, callback) {
+				//REQUIRED: methodNameOrParams
+				//OPTIONAL: methodNameOrParams.methodName
+				//OPTIONAL: methodNameOrParams.data
+				//OPTIONAL: methodNameOrParams.str
 				//OPTIONAL: callback
 
 				var
+				// method name
+				methodName,
+				
+				// data
+				data,
+				
+				// str
+				str,
+				
 				// callback name
 				callbackName;
 				
-				conn.write(STRINGIFY({
-					methodName : params.methodName,
-					data : params.data,
-					sendKey : sendKey
-				}) + '\r\n');
-
-				if (callback !== undefined) {
-					
-					callbackName = '__CALLBACK_' + sendKey;
-
-					// on callback.
-					on(callbackName, function(data) {
-
-						// run callback.
-						callback(data);
-
-						// off callback.
-						off(callbackName);
-					});
+				if (CHECK_IS_DATA(methodNameOrParams) !== true) {
+					methodName = methodNameOrParams;
+				} else {
+					methodName = methodNameOrParams.methodName;
+					data = methodNameOrParams.data;
+					str = methodNameOrParams.str;
 				}
-
-				sendKey += 1;
 				
-				clientInfo.lastReceiveTime = new Date();
+				if (conn !== undefined && conn.writable === true) {
+					
+					if (str !== undefined) {
+						conn.write(str + '\r\n');
+					}
+					
+					else {
+						
+						conn.write(STRINGIFY({
+							methodName : methodName,
+							data : data,
+							sendKey : sendKey
+						}) + '\r\n');
+					}
+	
+					if (callback !== undefined) {
+						
+						callbackName = '__CALLBACK_' + sendKey;
+	
+						// on callback.
+						on(callbackName, function(data) {
+	
+							// run callback.
+							callback(data);
+	
+							// off callback.
+							off(callbackName);
+						});
+					}
+	
+					sendKey += 1;
+					
+					clientInfo.lastReceiveTime = new Date();
+				}
 			},
 
 			// disconnect.
 			function() {
-				conn.end();
+				if (conn !== undefined) {
+					conn.end();
+					conn = undefined;
+				}
 			});
 		});
 
@@ -8861,14 +9120,20 @@ global.WEB_SERVER = CLASS(function(cls) {
 			// no parsing params uri
 			noParsingParamsURI,
 
-			// server
+			// native http server
 			nativeHTTPServer,
+
+			// native https server
+			nativeHTTPSServer,
 
 			// serve.
 			serve,
 
 			// get native http server.
-			getNativeHTTPServer;
+			getNativeHTTPServer,
+
+			// get native https server.
+			getNativeHTTPSServer;
 
 			// init params.
 			if (CHECK_IS_DATA(portOrParams) !== true) {
@@ -8881,7 +9146,7 @@ global.WEB_SERVER = CLASS(function(cls) {
 				noParsingParamsURI = portOrParams.noParsingParamsURI;
 			}
 
-			serve = function(nativeReq, nativeRes) {
+			serve = function(nativeReq, nativeRes, isSecure) {
 
 				var
 				// headers
@@ -8936,6 +9201,8 @@ global.WEB_SERVER = CLASS(function(cls) {
 						nativeReq.on('data', function(data) {
 							if (paramStr === undefined) {
 								paramStr = '';
+							} else {
+								paramStr += '&';
 							}
 							paramStr += data;
 						});
@@ -8954,6 +9221,15 @@ global.WEB_SERVER = CLASS(function(cls) {
 						params = querystring.parse(paramStr),
 						
 						// data
+						data;
+						
+						EACH(params, function(param, name) {
+							
+							if (CHECK_IS_ARRAY(param) === true) {
+								params[name] = param[param.length - 1];
+							}
+						});
+						
 						data = params.__DATA;
 						
 						if (data !== undefined) {
@@ -8966,6 +9242,8 @@ global.WEB_SERVER = CLASS(function(cls) {
 						requestListener( requestInfo = {
 
 							headers : headers,
+							
+							isSecure : isSecure,
 
 							uri : uri,
 
@@ -8990,6 +9268,10 @@ global.WEB_SERVER = CLASS(function(cls) {
 							//OPTIONAL: contentOrParams.contentType
 							//OPTIONAL: contentOrParams.content
 							//OPTIONAL: contentOrParams.buffer
+							//OPTIONAL: contentOrParams.totalSize
+							//OPTIONAL: contentOrParams.startPosition
+							//OPTIONAL: contentOrParams.endPosition
+							//OPTIONAL: contentOrParams.stream
 							//OPTIONAL: contentOrParams.encoding
 							//OPTIONAL: contentOrParams.version
 							//OPTIONAL: contentOrParams.isFinal
@@ -9009,6 +9291,18 @@ global.WEB_SERVER = CLASS(function(cls) {
 
 							// buffer
 							buffer,
+							
+							// total size
+							totalSize,
+							
+							// start position
+							startPosition,
+							
+							// end position
+							endPosition,
+							
+							// stream
+							stream,
 
 							// encoding
 							encoding,
@@ -9024,22 +9318,21 @@ global.WEB_SERVER = CLASS(function(cls) {
 								if (CHECK_IS_DATA(contentOrParams) !== true) {
 									content = contentOrParams;
 								} else {
+									
 									statusCode = contentOrParams.statusCode;
 									headers = contentOrParams.headers;
 									contentType = contentOrParams.contentType;
 									content = contentOrParams.content;
 									buffer = contentOrParams.buffer;
+									
+									totalSize = contentOrParams.totalSize;
+									startPosition = contentOrParams.startPosition;
+									endPosition = contentOrParams.endPosition;
+									stream = contentOrParams.stream;
+									
 									encoding = contentOrParams.encoding;
 									version = contentOrParams.version;
 									isFinal = contentOrParams.isFinal;
-								}
-								
-								if (content === undefined) {
-									content = '';
-								}
-
-								if (statusCode === undefined) {
-									statusCode = 200;
 								}
 
 								if (headers === undefined) {
@@ -9055,29 +9348,51 @@ global.WEB_SERVER = CLASS(function(cls) {
 									headers['Content-Type'] = contentType + '; charset=' + encoding;
 								}
 
-								if (CONFIG.isDevMode !== true) {
-									if (isFinal === true) {
-										headers['ETag'] = 'FINAL';
-									} else if (version !== undefined) {
-										headers['ETag'] = version;
-									}
+								if (stream !== undefined) {
+									
+									headers['Content-Range'] = 'bytes ' + startPosition + '-' + endPosition + '/' + totalSize;
+									headers['Accept-Ranges'] = 'bytes';
+									headers['Content-Length'] = endPosition - startPosition + 1;
+									
+									nativeRes.writeHead(206, headers);
+									
+									stream.pipe(nativeRes);
 								}
 								
-								// when gzip encoding
-								if (acceptEncoding.match(/\bgzip\b/) !== TO_DELETE) {
-
-									headers['Content-Encoding'] = 'gzip';
-
-									zlib.gzip(buffer !== undefined ? buffer : String(content), function(error, buffer) {
-										nativeRes.writeHead(statusCode, headers);
-										nativeRes.end(buffer, encoding);
-									});
-								}
-
-								// when not encoding
 								else {
-									nativeRes.writeHead(statusCode, headers);
-									nativeRes.end(buffer !== undefined ? buffer : String(content), encoding);
+									
+									if (content === undefined) {
+										content = '';
+									}
+									
+									if (statusCode === undefined) {
+										statusCode = 200;
+									}
+									
+									if (CONFIG.isDevMode !== true) {
+										if (isFinal === true) {
+											headers['ETag'] = 'FINAL';
+										} else if (version !== undefined) {
+											headers['ETag'] = version;
+										}
+									}
+									
+									// when gzip encoding
+									if (acceptEncoding.match(/\bgzip\b/) !== TO_DELETE) {
+	
+										headers['Content-Encoding'] = 'gzip';
+	
+										zlib.gzip(buffer !== undefined ? buffer : String(content), function(error, buffer) {
+											nativeRes.writeHead(statusCode, headers);
+											nativeRes.end(buffer, encoding);
+										});
+									}
+	
+									// when not encoding
+									else {
+										nativeRes.writeHead(statusCode, headers);
+										nativeRes.end(buffer !== undefined ? buffer : String(content), encoding);
+									}
 								}
 
 								requestInfo.isResponsed = true;
@@ -9106,22 +9421,30 @@ global.WEB_SERVER = CLASS(function(cls) {
 
 			// init sever.
 			if (port !== undefined) {
-				nativeHTTPServer = http.createServer(serve).listen(port);
+				nativeHTTPServer = http.createServer(function(nativeReq, nativeRes) {
+					serve(nativeReq, nativeRes, false);
+				}).listen(port);
 			}
 
 			// init secured sever.
 			if (securedPort !== undefined) {
 
-				nativeHTTPServer = https.createServer({
+				nativeHTTPSServer = https.createServer({
 					key : fs.readFileSync(securedKeyFilePath),
 					cert : fs.readFileSync(securedCertFilePath)
-				}, serve).listen(securedPort);
+				}, function(nativeReq, nativeRes) {
+					serve(nativeReq, nativeRes, true);
+				}).listen(securedPort);
 			}
 
 			console.log('[UJS-WEB_SERVER] RUNNING WEB SERVER...' + (port === undefined ? '' : (' (PORT:' + port + ')')) + (securedPort === undefined ? '' : (' (SECURED PORT:' + securedPort + ')')));
 
 			self.getNativeHTTPServer = getNativeHTTPServer = function() {
 				return nativeHTTPServer;
+			};
+			
+			self.getNativeHTTPSServer = getNativeHTTPSServer = function() {
+				return nativeHTTPSServer;
 			};
 		}
 	};
@@ -9130,7 +9453,7 @@ global.WEB_SERVER = CLASS(function(cls) {
 /**
  * parse cookie str.
  */
-global.PARSE_COOKIE_STR = PARSE_COOKIE_STR = METHOD({
+global.PARSE_COOKIE_STR = METHOD({
 
 	run : function(str) {
 		'use strict';
@@ -9164,7 +9487,7 @@ global.PARSE_COOKIE_STR = PARSE_COOKIE_STR = METHOD({
 /**
  * create cookie str array.
  */
-global.CREATE_COOKIE_STR_ARRAY = CREATE_COOKIE_STR_ARRAY = METHOD({
+global.CREATE_COOKIE_STR_ARRAY = METHOD({
 
 	run : function(data) {
 		'use strict';
