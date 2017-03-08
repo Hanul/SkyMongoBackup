@@ -3,7 +3,7 @@
 
 ## 설정
 `config.json` 파일을 수정합니다.
-```javascript
+```json
 {
 	"dbName": "test",
 	"dbHost": "127.0.0.1",
