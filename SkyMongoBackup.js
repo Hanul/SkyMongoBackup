@@ -127,7 +127,7 @@ INTERVAL(60, RAR(() => {
 						
 						let zip = JSZip();
 						
-						scanFolder(rootPath + '/__PACK/' + boxName, '', (fromPath, toPath) => {
+						scanFolder(__dirname + '/__BACKUP/' + todayStr, '', (fromPath, toPath) => {
 							
 							zip.file(toPath, READ_FILE({
 								path : fromPath,
