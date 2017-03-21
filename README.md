@@ -9,17 +9,10 @@
 	"dbHost": "127.0.0.1",
 	"dbPort": 27017,
 	"dbUsername": "test",
-	"dbPassword": "1234",
-	
-	"backupPort": 8308
-	
-	"backupServerHost": "127.0.0.1",
-	"backupServerPort": 8308
+	"dbPassword": "1234"
 }
 ```
 * `dbName`는 필수이며, 나머지 설정들은 선택입니다.
-* `backupPort`를 설정하게되면 백업 서버를 구동합니다.
-* `backupServerHost`와 `backupServerPort`로 백업 서버에 접속합니다.
 
 ## 실행
 ```
