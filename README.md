@@ -11,7 +11,7 @@
 	"dbUsername": "test",
 	"dbPassword": "1234",
 	
-	"backupPort": 8308
+	"backupPort": 8308,
 	
 	"backupServerHost": "127.0.0.1",
 	"backupServerPort": 8308
