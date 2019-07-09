@@ -122,11 +122,11 @@ INTERVAL(60, RAR(() => {
 			}
 		});
 		
-		let lastDayCal = CALENDAR(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000));
-		let lastDayStr = lastDayCal.getYear() + '-' + lastDayCal.getMonth(true) + '-' + lastDayCal.getDate(true);
+		let last3DayCal = CALENDAR(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000));
+		let last3DayStr = last3DayCal.getYear() + '-' + last3DayCal.getMonth(true) + '-' + last3DayCal.getDate(true);
 		
-		// 어제껀 삭제
-		REMOVE_FOLDER(__dirname + '/__BACKUP/' + lastDayStr);
+		// 3일전 껀 삭제
+		REMOVE_FOLDER(__dirname + '/__BACKUP/' + last3DayStr);
 	}
 }));
 
